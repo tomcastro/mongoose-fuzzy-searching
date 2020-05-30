@@ -1,7 +1,3 @@
-const mongoose = require('mongoose');
-
-const { Model } = mongoose;
-
 const {
   config: { DEFAULT_MIN_SIZE, DEFAULT_PREFIX_ONLY, validMiddlewares },
   createFields,
@@ -170,9 +166,10 @@ module.exports = function (schema, pluginOptions) {
 
     const queryString = isObject(queryArgs[0]) ? queryArgs[0].query : queryArgs[0];
     const exact = isObject(queryArgs[0]) ? !!queryArgs[0].exact : false;
+    const { options } = parseArguments(queryArgs, 1, 2);
 
     if (!queryString) {
-      return Model.find.apply(this);
+      return this.find(options || {});
     }
 
     const { checkPrefixOnly, defaultNgamMinSize } = getDefaultValues(queryArgs[0]);
@@ -180,8 +177,6 @@ module.exports = function (schema, pluginOptions) {
     const query = exact
       ? `"${queryString}"`
       : nGrams(queryString, false, defaultNgamMinSize, checkPrefixOnly).join(' ');
-
-    const { callback, options } = parseArguments(queryArgs, 1, 2);
 
     let search;
 
@@ -197,11 +192,12 @@ module.exports = function (schema, pluginOptions) {
       };
     }
 
-    return Model.find.apply(this, [
-      search,
-      { confidenceScore: { $meta: 'textScore' } },
-      { sort: { confidenceScore: { $meta: 'textScore' } } },
-      callback,
-    ]);
+    let find = this.find(search, { confidenceScore: { $meta: 'textScore' } });
+
+    if (queryString.length >= defaultNgamMinSize) {
+      find = find.sort({ confidenceScore: { $meta: 'textScore' } });
+    }
+
+    return find;
   };
 };

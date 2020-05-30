@@ -1,3 +1,5 @@
+const { isFunction } = require('../utils');
+
 class Create {
   constructor(schema, Type, addToSchema, addArrayToSchema) {
     this.indexes = {};
@@ -41,6 +43,10 @@ class Remove {
   fromObject(item) {
     delete this.schema[`${item.name}_fuzzy`];
   }
+
+  fromObjectKeys(item) {
+    delete this.schema[`${item.name}_fuzzy`];
+  }
 }
 
 class Generate {
@@ -62,24 +68,34 @@ class Generate {
   }
 
   fromObject(item) {
-    if (this.attributes[`${item.name}`]) {
+    const attributes = this.attributes[`${item.name}`] ? this.attributes : this.attributes.$set;
+
+    if (attributes[`${item.name}`]) {
       const escapeSpecialCharacters = item.escapeSpecialCharacters !== false;
-      this.attributes[`${item.name}_fuzzy`] = this.makeNGrams(
-        this.attributes[item.name],
+      const value = isFunction(item.format)
+        ? item.format(attributes[item.name])
+        : attributes[item.name];
+      attributes[`${item.name}_fuzzy`] = this.makeNGrams(
+        value,
         escapeSpecialCharacters,
         item.minSize,
         item.prefixOnly,
       );
+
+      if (!this.attributes[`${item.name}`]) this.attributes.$set = attributes;
+      else this.attributes = attributes;
     }
   }
 
   fromObjectKeys(item) {
-    if (this.attributes[`${item.name}`]) {
+    const attributes = this.attributes[`${item.name}`] ? this.attributes : this.attributes.$set;
+
+    if (attributes[`${item.name}`]) {
       const escapeSpecialCharacters = item.escapeSpecialCharacters !== false;
       const attrs = [];
       let obj = {};
 
-      let data = this.attributes[item.name];
+      let data = attributes[item.name];
       if (!Array.isArray(data)) {
         data = [data];
       }
@@ -98,7 +114,11 @@ class Generate {
         });
         attrs.push(obj);
       });
-      this.attributes[`${item.name}_fuzzy`] = attrs;
+
+      attributes[`${item.name}_fuzzy`] = attrs;
+
+      if (!this.attributes[`${item.name}`]) this.attributes.$set = attributes;
+      else this.attributes = attributes;
     }
   }
 }
